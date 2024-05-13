@@ -1,0 +1,8 @@
+1. Creating player/ spaceship
+2. Creating bullets and projectiles
+3. Creating enemies
+4. Creating enemy patterns
+5. Creating gamestate manager 
+6. Creating game stages
+7. Game over state
+8. Main menu state
