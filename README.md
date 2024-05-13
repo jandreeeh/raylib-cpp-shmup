@@ -4,12 +4,16 @@
 
 Very cool and awesome gaem made in raylib cpp
 
+## Instructions
+
+If you have raylib setup in your ide/code editor, paste this there and run ig (this setup is for vs code :( ) 
 
 ### Developers
 
  - John Andrei Lee
  - Reygian Mateo
  - Christopher John Destajo
+
 
 ### License
 
