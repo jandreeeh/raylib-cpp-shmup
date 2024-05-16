@@ -5,8 +5,9 @@ void GameUpdate();
 void GameDraw();
 
 #define MAX_NUM_PEASHOOTER 50
-#define MAX_NUM_RUNNER 25
-#define MAX_NUM_TANK 25
+#define MAX_NUM_UP_CADET 20
+#define MAX_NUM_DOWN_CADET 20
+#define MAX_NUM_TURRET 50
 
 #define SCREEN_WIDTH 1280
 #define SCREEN_HEIGHT 720
