@@ -65,6 +65,11 @@ static void PeashooterDeactivate(int i);
 static void UpCadetDeactivate(int i);
 static void DownCadetDeactivate(int i);
 static void TurretDeactivate(int i);
+static void PlayerUpdate();
+static void PeashooterUpdate();
+static void CadetUpdate();
+static void TurretUpdate();
+static void PlayerBulletUpdate();
 
 //-------------------------------------
 //Local variables
@@ -135,15 +140,6 @@ void GameInitialize(){
     shipThrust.framesPerSecond = 16;
     shipThrust.source = {0.0f, 0.0f, (float)shipThrust.atlas.width/shipThrust.numFrames, (float)shipThrust.atlas.height};
 
-    //initialize player bullets
-    for(int i = 0; i < MAX_PLAYER_BULLETS; i++){
-        pShot[i].sprite = LoadTexture("src/graphics/player_proj.png");
-        pShot[i].hitbox.height = pShot[i].sprite.height;
-        pShot[i].hitbox.width = pShot[i].sprite.width;
-        pShot[i].speed = 500;
-        pShot[i].active = false;
-    }
-
      //initialize peashooter
     for(int i = 0; i < MAX_NUM_PEASHOOTER; i++){
         peashooter[i].position.x = GetRandomValue(VSCREEN_WIDTH, VSCREEN_WIDTH + 100);
@@ -165,7 +161,7 @@ void GameInitialize(){
         upCadet[i].hitbox.width = 32;
         upCadet[i].hitbox.x = upCadet[i].position.x;
         upCadet[i].hitbox.y = upCadet[i].position.y;
-        upCadet[i].health = 3;
+        upCadet[i].health = 2;
         upCadet[i].speed = 100;
         upCadet[i].active = false;
         upCadet[i].spawnLocation = 0;
@@ -220,6 +216,14 @@ void GameInitialize(){
         tShot[i].dirCalc = false;
     }
 
+    //initialize player bullets
+    for(int i = 0; i < MAX_PLAYER_BULLETS; i++){
+        pShot[i].sprite = LoadTexture("src/graphics/player_proj.png");
+        pShot[i].hitbox.height = pShot[i].sprite.height;
+        pShot[i].hitbox.width = pShot[i].sprite.width;
+        pShot[i].speed = 500;
+        pShot[i].active = false;
+    }
 }
 
 
@@ -227,196 +231,27 @@ void GameUpdate(){
     // Handles enemy spawning
     Spawner();
 
+    //Thruster animation
     AnimationUpdate(shipThrust.atlas, shipThrust.source, shipThrust.currentFrame, shipThrust.framesPerSecond, shipThrust.numFrames);
     shipThrust.position.x = player.position.x - shipThrust.atlas.width/shipThrust.numFrames;
     shipThrust.position.y = player.position.y + (player.sprite.height/2 - shipThrust.atlas.height/2);
 
-    //Player Input
-    if (IsKeyDown(KEY_LEFT)){player.position.x -= player.speed * GetFrameTime();}
-    if (IsKeyDown(KEY_RIGHT)){player.position.x += player.speed * GetFrameTime();}
-    if (IsKeyDown(KEY_UP)){player.position.y -= player.speed * GetFrameTime();}
-    if (IsKeyDown(KEY_DOWN)){player.position.y += player.speed * GetFrameTime();}
-
-    if(player.position.x < 0){player.position.x = (float)0;}
-    if(player.position.x > VSCREEN_WIDTH - player.sprite.width){player.position.x = VSCREEN_WIDTH - player.sprite.width;}
-    if(player.position.y < 0){player.position.y = (float)0;}
-    if(player.position.y > VSCREEN_HEIGHT - player.sprite.height){player.position.y = VSCREEN_HEIGHT - player.sprite.height;}
-
-    if(IsKeyDown(KEY_SPACE)){
-        for(int i = 0; i < MAX_PLAYER_BULLETS; i++){
-            if(canShoot){
-                if (!pShot[i].active){
-                    pShot[i].position.x = player.position.x + player.sprite.width;
-                    pShot[i].position.y = player.position.y + (player.sprite.height/2 - pShot[i].sprite.height/2);
-                    pShot[i].active = true;
-                    canShoot = false;
-                    break;
-                }
-            }
-                if(!canShoot){
-                    shootTime += GetFrameTime();
-                    if(shootTime > 10){
-                        shootTime = 0;
-                        canShoot = true;
-                    }
-                }
-        }
-    }
-    else if(!IsKeyDown(KEY_SPACE)){
-         canShoot = true;
-         shootTime = 0;
-    }
-    //std::cout << shootTime << "\n";
+    //Player input and update
+    PlayerUpdate();
 
     //Enemy Movement
     //Peashooter:
-    for (int i = 0; i < MAX_NUM_PEASHOOTER; i++){
-        if (peashooter[i].active){
-            peashooter[i].position.x -= peashooter[i].speed * GetFrameTime();
-            peashooter[i].hitbox.x = peashooter[i].position.x;
-            peashooter[i].hitbox.y = peashooter[i].position.y;
-        }
-        if (peashooter[i].position.x < -50){
-            PeashooterDeactivate(i);
-        }
-    }
+    PeashooterUpdate();
 
     //Cadet:
-    //Up Cadet
-    for (int i = 0; i < MAX_NUM_UP_CADET; i++){
-        if (upCadet[i].active){
-            upCadet[i].time += GetFrameTime();
-            upCadet[i].position.y += upCadet[i].speed * GetFrameTime();
-            upCadet[i].position.x = cadetXPos + cos(upCadet[i].time) * 50;
-            upCadet[i].hitbox.x = upCadet[i].position.x;
-            upCadet[i].hitbox.y = upCadet[i].position.y;
-        }
-        if (upCadet[i].position.y > VSCREEN_HEIGHT + 50){
-            UpCadetDeactivate(i);
-        }
-    }
-    //Down Cadet
-    for (int i = 0; i < MAX_NUM_DOWN_CADET; i++){
-        if (downCadet[i].active){
-            downCadet[i].time += GetFrameTime();
-            downCadet[i].position.y -= downCadet[i].speed * GetFrameTime();
-            downCadet[i].position.x = cadetXPos + cos(downCadet[i].time) * 50;
-            downCadet[i].hitbox.x = downCadet[i].position.x;
-            downCadet[i].hitbox.y = downCadet[i].position.y;
-        }
-        if (downCadet[i].position.y < -50){
-            DownCadetDeactivate(i);
-        }
-    }
+    CadetUpdate();
 
     //Turret:
-    for (int i = 0; i < MAX_NUM_TURRET; i++){
-        if(turret[i].active){
+    TurretUpdate();
 
-            turret[i].hitbox.x = turret[i].position.x;
-            turret[i].hitbox.y = turret[i].position.y;
-
-            if(!turret[i].startShoot){
-                turret[i].position = Vector2MoveTowards(turret[i].position, turret[i].targetPos, turret[i].speed * GetFrameTime());
-
-                if (Vector2Distance(turret[i].position, turret[i].targetPos) < 5){
-                    turret[i].startShoot = true;
-                }
-            }
-            else if(turret[i].startShoot){
-                turret[i].time += GetFrameTime();
-                if(turret[i].time > turret[i].shootRate){
-                    tShot[bulletIndex].position = turret[i].position;
-                    tShot[bulletIndex].active = true;
-                    bulletIndex++;
-                    turret[i].time = 0;
-                }
-            }
-        }
-    }
-    if(bulletIndex > MAX_TURRET_BULLETS){
-        bulletIndex = 0;
-    }
-
-    for(int i = 0; i < MAX_TURRET_BULLETS; i++){
-        if(tShot[i].active){
-            if(!tShot[i].dirCalc){
-                tShot[i].direction = Vector2Normalize(Vector2Subtract(player.position, tShot[i].position));
-                tShot[i].dirCalc = true;
-            }
-                else if(tShot[i].dirCalc){
-                    tShot[i].position.x += tShot[i].direction.x * tShot[i].speed * GetFrameTime();
-                    tShot[i].position.y += tShot[i].direction.y * tShot[i].speed * GetFrameTime();
-                }
-
-        }
     //Player Bullet:
-    for(int i = 0; i < MAX_PLAYER_BULLETS; i++){
-        if(pShot[i].active){
-            pShot[i].position.x += pShot[i].speed * GetFrameTime();
-            pShot[i].hitbox.x = pShot[i].position.x;
-            pShot[i].hitbox.y = pShot[i].position.y;
+    PlayerBulletUpdate();
 
-            if(pShot[i].position.x > VSCREEN_WIDTH){
-                pShot[i].active = false;
-                shootRate = 0;
-            }
-
-            //Bullet enemy collision
-            for (int j = 0; j < MAX_NUM_PEASHOOTER; j++){
-                if(peashooter[j].active){
-                    if(CheckCollisionRecs(pShot[i].hitbox, peashooter[j].hitbox)){
-                        peashooter[j].health--;
-                        if(peashooter[j].health <= 0){
-                            PeashooterDeactivate(j);
-                        }
-                        std::cout << "Peashooter " << i << " collided\n";
-                        pShot[i].active = false;
-                    }
-                }
-            }
-            for (int j = 0; j < MAX_NUM_UP_CADET; j++){
-                if(upCadet[j].active){
-                    if(CheckCollisionRecs(pShot[i].hitbox, upCadet[j].hitbox)){
-                        upCadet[j].health--;
-                        if(upCadet[j].health <= 0){
-                            UpCadetDeactivate(j);
-                        }
-                        pShot[i].active = false;
-                    }
-                }
-            }
-            for (int j = 0; j < MAX_NUM_DOWN_CADET; j++){
-                if(downCadet[j].active){
-                    if(CheckCollisionRecs(pShot[i].hitbox, downCadet[j].hitbox)){
-                        downCadet[j].health--;
-                        if(downCadet[j].health <= 0){
-                            DownCadetDeactivate(j);
-                        }
-                        pShot[i].active = false;
-                    }
-                }
-            }
-            for (int j = 0; j < MAX_NUM_TURRET; j++){
-                if(turret[j].active){
-                    if(CheckCollisionRecs(pShot[i].hitbox, turret[j].hitbox)){
-                        turret[j].health--;
-                        if(turret[j].health <=0){
-                        TurretDeactivate(j);
-                        turretSpawned--;
-                        }
-                        pShot[i].active = false;
-                    }
-                }
-            }
-        }
-    }
-
-    }
-    // if(IsKeyPressed(KEY_Q)){
-    //     tShot[bulletIndex].active = true;
-    //     bulletIndex++;
-    // }
 }
 
 void GameDraw(){
@@ -565,4 +400,188 @@ static void TurretDeactivate(int i){
             turret[i].targetPos.y = VSCREEN_HEIGHT - 50 - 32;
             turretPos = 0;
         }
+}
+
+static void PlayerUpdate(){
+    if (IsKeyDown(KEY_LEFT)){player.position.x -= player.speed * GetFrameTime();}
+    if (IsKeyDown(KEY_RIGHT)){player.position.x += player.speed * GetFrameTime();}
+    if (IsKeyDown(KEY_UP)){player.position.y -= player.speed * GetFrameTime();}
+    if (IsKeyDown(KEY_DOWN)){player.position.y += player.speed * GetFrameTime();}
+
+    if(player.position.x < 0){player.position.x = (float)0;}
+    if(player.position.x > VSCREEN_WIDTH - player.sprite.width){player.position.x = VSCREEN_WIDTH - player.sprite.width;}
+    if(player.position.y < 0){player.position.y = (float)0;}
+    if(player.position.y > VSCREEN_HEIGHT - player.sprite.height){player.position.y = VSCREEN_HEIGHT - player.sprite.height;}
+
+    if(IsKeyDown(KEY_SPACE)){
+        for(int i = 0; i < MAX_PLAYER_BULLETS; i++){
+            if(canShoot){
+                if (!pShot[i].active){
+                    pShot[i].position.x = player.position.x + player.sprite.width;
+                    pShot[i].position.y = player.position.y + (player.sprite.height/2 - pShot[i].sprite.height/2);
+                    pShot[i].active = true;
+                    canShoot = false;
+                    break;
+                }
+            }
+                if(!canShoot){
+                    shootTime += GetFrameTime();
+                    if(shootTime > 10){
+                        shootTime = 0;
+                        canShoot = true;
+                    }
+                }
+        }
+    }
+    else if(!IsKeyDown(KEY_SPACE)){
+         canShoot = true;
+         shootTime = 0;
+    }
+}
+
+static void PeashooterUpdate(){
+    for (int i = 0; i < MAX_NUM_PEASHOOTER; i++){
+        if (peashooter[i].active){
+            peashooter[i].position.x -= peashooter[i].speed * GetFrameTime();
+            peashooter[i].hitbox.x = peashooter[i].position.x;
+            peashooter[i].hitbox.y = peashooter[i].position.y;
+        }
+        if (peashooter[i].position.x < -50){
+            PeashooterDeactivate(i);
+        }
+    }
+}
+
+static void CadetUpdate(){
+    //Up Cadet
+    for (int i = 0; i < MAX_NUM_UP_CADET; i++){
+        if (upCadet[i].active){
+            upCadet[i].time += GetFrameTime();
+            upCadet[i].position.y += upCadet[i].speed * GetFrameTime();
+            upCadet[i].position.x = cadetXPos + cos(upCadet[i].time) * 50;
+            upCadet[i].hitbox.x = upCadet[i].position.x;
+            upCadet[i].hitbox.y = upCadet[i].position.y;
+        }
+        if (upCadet[i].position.y > VSCREEN_HEIGHT + 50){
+            UpCadetDeactivate(i);
+        }
+    }
+    //Down Cadet
+    for (int i = 0; i < MAX_NUM_DOWN_CADET; i++){
+        if (downCadet[i].active){
+            downCadet[i].time += GetFrameTime();
+            downCadet[i].position.y -= downCadet[i].speed * GetFrameTime();
+            downCadet[i].position.x = cadetXPos + cos(downCadet[i].time) * 50;
+            downCadet[i].hitbox.x = downCadet[i].position.x;
+            downCadet[i].hitbox.y = downCadet[i].position.y;
+        }
+        if (downCadet[i].position.y < -50){
+            DownCadetDeactivate(i);
+        }
+    }
+}
+
+static void TurretUpdate(){
+    for (int i = 0; i < MAX_NUM_TURRET; i++){
+        if(turret[i].active){
+
+            turret[i].hitbox.x = turret[i].position.x;
+            turret[i].hitbox.y = turret[i].position.y;
+
+            if(!turret[i].startShoot){
+                turret[i].position = Vector2MoveTowards(turret[i].position, turret[i].targetPos, turret[i].speed * GetFrameTime());
+
+                if (Vector2Distance(turret[i].position, turret[i].targetPos) < 5){
+                    turret[i].startShoot = true;
+                }
+            }
+            else if(turret[i].startShoot){
+                turret[i].time += GetFrameTime();
+                if(turret[i].time > turret[i].shootRate){
+                    tShot[bulletIndex].position = turret[i].position;
+                    tShot[bulletIndex].active = true;
+                    bulletIndex++;
+                    turret[i].time = 0;
+                }
+            }
+        }
+    }
+    if(bulletIndex > MAX_TURRET_BULLETS){
+        bulletIndex = 0;
+    }
+
+    for(int i = 0; i < MAX_TURRET_BULLETS; i++){
+        if(tShot[i].active){
+            if(!tShot[i].dirCalc){
+                tShot[i].direction = Vector2Normalize(Vector2Subtract(player.position, tShot[i].position));
+                tShot[i].dirCalc = true;
+            }
+            else if(tShot[i].dirCalc){
+                tShot[i].position.x += tShot[i].direction.x * tShot[i].speed * GetFrameTime();
+                tShot[i].position.y += tShot[i].direction.y * tShot[i].speed * GetFrameTime();
+            }
+        }
+    }
+}
+
+static void PlayerBulletUpdate(){
+    for(int i = 0; i < MAX_PLAYER_BULLETS; i++){
+        if(pShot[i].active){
+            pShot[i].position.x += pShot[i].speed * GetFrameTime();
+            pShot[i].hitbox.x = pShot[i].position.x;
+            pShot[i].hitbox.y = pShot[i].position.y;
+
+            if(pShot[i].position.x > VSCREEN_WIDTH){
+                pShot[i].active = false;
+            }
+
+            //Bullet enemy collision
+            for (int j = 0; j < MAX_NUM_PEASHOOTER; j++){
+                if(peashooter[j].active){
+                    if(CheckCollisionRecs(pShot[i].hitbox, peashooter[j].hitbox)){
+                        peashooter[j].health--;
+                        if(peashooter[j].health <= 0){
+                            PeashooterDeactivate(j);
+                        }
+                        std::cout << "Peashooter " << i << " collided\n";
+                        pShot[i].active = false;
+                    }
+                }
+            }
+            for (int j = 0; j < MAX_NUM_UP_CADET; j++){
+                if(upCadet[j].active){
+                    if(CheckCollisionRecs(pShot[i].hitbox, upCadet[j].hitbox)){
+                        upCadet[j].health--;
+                        if(upCadet[j].health <= 0){
+                            UpCadetDeactivate(j);
+                        }
+                        pShot[i].active = false;
+                    }
+                }
+            }
+            for (int j = 0; j < MAX_NUM_DOWN_CADET; j++){
+                if(downCadet[j].active){
+                    if(CheckCollisionRecs(pShot[i].hitbox, downCadet[j].hitbox)){
+                        downCadet[j].health--;
+                        if(downCadet[j].health <= 0){
+                            DownCadetDeactivate(j);
+                        }
+                        pShot[i].active = false;
+                    }
+                }
+            }
+            for (int j = 0; j < MAX_NUM_TURRET; j++){
+                if(turret[j].active){
+                    if(CheckCollisionRecs(pShot[i].hitbox, turret[j].hitbox)){
+                        turret[j].health--;
+                        if(turret[j].health <=0){
+                        TurretDeactivate(j);
+                        turretSpawned--;
+                        }
+                        pShot[i].active = false;
+                    }
+                }
+            }
+        }
+    }
 }
