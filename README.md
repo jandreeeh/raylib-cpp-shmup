@@ -28,8 +28,15 @@ This game sources are licensed under an unmodified zlib/libpng license, which is
 - Spawn time for enemy
 - General code clean up
 
-5/16/24
+5/17/24
 
 - Implemented two new enemies
  - Cadets: Move in a row across the screen
  - Turrets: Stays in one position and shoots the player (shooting not implemented)
+
+5/18/24
+
+- Implemented player shooting
+- Enemy bullet collision
+- Refined spawner
+- TBA
