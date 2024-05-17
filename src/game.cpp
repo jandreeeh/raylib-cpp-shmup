@@ -4,6 +4,7 @@
 #include <cmath>
 
 #include "game.h"
+#include "anim.h"
 
 typedef struct Player {
     Vector2 position;
@@ -41,6 +42,7 @@ typedef struct Turret {
     Texture2D sprite;
     Rectangle hitbox;
     int health;
+    int shootRate;
     double speed;
     double time;
     bool startShoot;
@@ -49,11 +51,12 @@ typedef struct Turret {
 
 typedef struct Bullet{
     Vector2 position;
-    Vector2 target;
+    Vector2 direction;
     Texture2D sprite;
     Rectangle hitbox;
     int speed;
     bool active;
+    bool dirCalc;
 } Bullet;
 
 //Declaration of local functions
@@ -75,6 +78,7 @@ static Cadet downCadet[MAX_NUM_DOWN_CADET] = {0};
 static Turret turret[MAX_NUM_TURRET] = {0};
 static Bullet pShot[MAX_PLAYER_BULLETS] = {0};
 static Bullet tShot[MAX_TURRET_BULLETS] = {0};
+static SpriteAnimate shipThrust = {0};
 
 //General variables
 static double spawnerTime = 0;
@@ -83,6 +87,7 @@ static double spawnerTime = 0;
 static bool canShoot = true;
 static double shootTime = 0;
 static double shootRate = 1;
+static int bulletIndex = 0;
 
 //Peashooter spawner variables
 static int peashooterStartSpawn = 0;
@@ -123,6 +128,22 @@ void GameInitialize(){
     player.hitbox.x = player.position.x;
     player.hitbox.y = player.position.y;
 
+    shipThrust.atlas = LoadTexture("src/graphics/spaceship_thrust.png");
+    shipThrust.position = player.position;
+    shipThrust.currentFrame = 0;
+    shipThrust.numFrames = 4;
+    shipThrust.framesPerSecond = 16;
+    shipThrust.source = {0.0f, 0.0f, (float)shipThrust.atlas.width/shipThrust.numFrames, (float)shipThrust.atlas.height};
+
+    //initialize player bullets
+    for(int i = 0; i < MAX_PLAYER_BULLETS; i++){
+        pShot[i].sprite = LoadTexture("src/graphics/player_proj.png");
+        pShot[i].hitbox.height = pShot[i].sprite.height;
+        pShot[i].hitbox.width = pShot[i].sprite.width;
+        pShot[i].speed = 500;
+        pShot[i].active = false;
+    }
+
      //initialize peashooter
     for(int i = 0; i < MAX_NUM_PEASHOOTER; i++){
         peashooter[i].position.x = GetRandomValue(VSCREEN_WIDTH, VSCREEN_WIDTH + 100);
@@ -132,7 +153,7 @@ void GameInitialize(){
         peashooter[i].hitbox.x = peashooter[i].position.x;
         peashooter[i].hitbox.y = peashooter[i].position.y;
         peashooter[i].speed = GetRandomValue(250, 500);
-        peashooter[i].health = 1;
+        peashooter[i].health = 2;
         peashooter[i].active = false;
     }
 
@@ -144,6 +165,7 @@ void GameInitialize(){
         upCadet[i].hitbox.width = 32;
         upCadet[i].hitbox.x = upCadet[i].position.x;
         upCadet[i].hitbox.y = upCadet[i].position.y;
+        upCadet[i].health = 3;
         upCadet[i].speed = 100;
         upCadet[i].active = false;
         upCadet[i].spawnLocation = 0;
@@ -157,6 +179,7 @@ void GameInitialize(){
         downCadet[i].hitbox.width = 32;
         downCadet[i].hitbox.x = downCadet[i].position.x;
         downCadet[i].hitbox.y = downCadet[i].position.y;
+        downCadet[i].health = 2;
         downCadet[i].speed = 100;
         downCadet[i].active = false;
         downCadet[i].spawnLocation = 0;
@@ -177,27 +200,36 @@ void GameInitialize(){
         }
         turret[i].hitbox.height = 32;           //Change value if sprite is made
         turret[i].hitbox.width = 32;
+        turret[i].shootRate = 3;
         turret[i].hitbox.x = turret[i].position.x;
         turret[i].hitbox.y = turret[i].position.y;
+        turret[i].health = 4;
         turret[i].speed = 200;
         turret[i].startShoot = false;
         turret[i].active = false;
     }
-
-    //initialize player bullets
-    for(int i = 0; i < MAX_PLAYER_BULLETS; i++){
-        pShot[i].sprite = LoadTexture("src/graphics/playerProjectile.png");
-        pShot[i].hitbox.height = pShot[i].sprite.height;
-        pShot[i].hitbox.width = pShot[i].sprite.width;
-        pShot[i].speed = 500;
-        pShot[i].active = false;
+    //Initialize turret bullets
+    for(int i = 0; i < MAX_TURRET_BULLETS; i++){
+        tShot[i].position.x = VSCREEN_WIDTH/2;  //Temporary position: Remove if done testing
+        tShot[i].position.y = VSCREEN_HEIGHT/2;
+        tShot[i].sprite = LoadTexture("src/graphics/enemy_proj.png");
+        tShot[i].hitbox.height = tShot[i].sprite.height;
+        tShot[i].hitbox.width = tShot[i].sprite.width;
+        tShot[i].speed = 250;
+        tShot[i].active = false;
+        tShot[i].dirCalc = false;
     }
+
 }
 
 
 void GameUpdate(){
     // Handles enemy spawning
     Spawner();
+
+    AnimationUpdate(shipThrust.atlas, shipThrust.source, shipThrust.currentFrame, shipThrust.framesPerSecond, shipThrust.numFrames);
+    shipThrust.position.x = player.position.x - shipThrust.atlas.width/shipThrust.numFrames;
+    shipThrust.position.y = player.position.y + (player.sprite.height/2 - shipThrust.atlas.height/2);
 
     //Player Input
     if (IsKeyDown(KEY_LEFT)){player.position.x -= player.speed * GetFrameTime();}
@@ -214,7 +246,7 @@ void GameUpdate(){
         for(int i = 0; i < MAX_PLAYER_BULLETS; i++){
             if(canShoot){
                 if (!pShot[i].active){
-                    pShot[i].position.x = player.position.x;
+                    pShot[i].position.x = player.position.x + player.sprite.width;
                     pShot[i].position.y = player.position.y + (player.sprite.height/2 - pShot[i].sprite.height/2);
                     pShot[i].active = true;
                     canShoot = false;
@@ -223,7 +255,7 @@ void GameUpdate(){
             }
                 if(!canShoot){
                     shootTime += GetFrameTime();
-                    if(shootTime > 6){
+                    if(shootTime > 10){
                         shootTime = 0;
                         canShoot = true;
                     }
@@ -235,7 +267,7 @@ void GameUpdate(){
          shootTime = 0;
     }
     //std::cout << shootTime << "\n";
- 
+
     //Enemy Movement
     //Peashooter:
     for (int i = 0; i < MAX_NUM_PEASHOOTER; i++){
@@ -293,27 +325,52 @@ void GameUpdate(){
             }
             else if(turret[i].startShoot){
                 turret[i].time += GetFrameTime();
+                if(turret[i].time > turret[i].shootRate){
+                    tShot[bulletIndex].position = turret[i].position;
+                    tShot[bulletIndex].active = true;
+                    bulletIndex++;
+                    turret[i].time = 0;
+                }
             }
         }
     }
+    if(bulletIndex > MAX_TURRET_BULLETS){
+        bulletIndex = 0;
+    }
 
+    for(int i = 0; i < MAX_TURRET_BULLETS; i++){
+        if(tShot[i].active){
+            if(!tShot[i].dirCalc){
+                tShot[i].direction = Vector2Normalize(Vector2Subtract(player.position, tShot[i].position));
+                tShot[i].dirCalc = true;
+            }
+                else if(tShot[i].dirCalc){
+                    tShot[i].position.x += tShot[i].direction.x * tShot[i].speed * GetFrameTime();
+                    tShot[i].position.y += tShot[i].direction.y * tShot[i].speed * GetFrameTime();
+                }
+
+        }
+    //Player Bullet:
     for(int i = 0; i < MAX_PLAYER_BULLETS; i++){
         if(pShot[i].active){
-
             pShot[i].position.x += pShot[i].speed * GetFrameTime();
             pShot[i].hitbox.x = pShot[i].position.x;
             pShot[i].hitbox.y = pShot[i].position.y;
-            
+
             if(pShot[i].position.x > VSCREEN_WIDTH){
                 pShot[i].active = false;
                 shootRate = 0;
             }
 
+            //Bullet enemy collision
             for (int j = 0; j < MAX_NUM_PEASHOOTER; j++){
                 if(peashooter[j].active){
                     if(CheckCollisionRecs(pShot[i].hitbox, peashooter[j].hitbox)){
+                        peashooter[j].health--;
+                        if(peashooter[j].health <= 0){
+                            PeashooterDeactivate(j);
+                        }
                         std::cout << "Peashooter " << i << " collided\n";
-                        PeashooterDeactivate(j);
                         pShot[i].active = false;
                     }
                 }
@@ -321,8 +378,10 @@ void GameUpdate(){
             for (int j = 0; j < MAX_NUM_UP_CADET; j++){
                 if(upCadet[j].active){
                     if(CheckCollisionRecs(pShot[i].hitbox, upCadet[j].hitbox)){
-                        std::cout << "upCadet " << i << " collided\n";
-                        UpCadetDeactivate(j);
+                        upCadet[j].health--;
+                        if(upCadet[j].health <= 0){
+                            UpCadetDeactivate(j);
+                        }
                         pShot[i].active = false;
                     }
                 }
@@ -330,8 +389,10 @@ void GameUpdate(){
             for (int j = 0; j < MAX_NUM_DOWN_CADET; j++){
                 if(downCadet[j].active){
                     if(CheckCollisionRecs(pShot[i].hitbox, downCadet[j].hitbox)){
-                        std::cout << "downCadet " << i << " collided\n";
-                        DownCadetDeactivate(j);
+                        downCadet[j].health--;
+                        if(downCadet[j].health <= 0){
+                            DownCadetDeactivate(j);
+                        }
                         pShot[i].active = false;
                     }
                 }
@@ -339,15 +400,23 @@ void GameUpdate(){
             for (int j = 0; j < MAX_NUM_TURRET; j++){
                 if(turret[j].active){
                     if(CheckCollisionRecs(pShot[i].hitbox, turret[j].hitbox)){
-                        std::cout << "turret " << i << " collided\n";
+                        turret[j].health--;
+                        if(turret[j].health <=0){
                         TurretDeactivate(j);
                         turretSpawned--;
+                        }
                         pShot[i].active = false;
                     }
                 }
             }
         }
     }
+
+    }
+    // if(IsKeyPressed(KEY_Q)){
+    //     tShot[bulletIndex].active = true;
+    //     bulletIndex++;
+    // }
 }
 
 void GameDraw(){
@@ -368,6 +437,10 @@ void GameDraw(){
     for (int i = 0; i < MAX_PLAYER_BULLETS; i++){
         if (pShot[i].active) DrawTexture(pShot[i].sprite, pShot[i].position.x, pShot[i].position.y, WHITE);
     }
+    for(int i = 0; i < MAX_TURRET_BULLETS; i++){
+        if(tShot[i].active) DrawTexture(tShot[i].sprite, tShot[i].position.x, tShot[i].position.y, WHITE);
+    }
+    DrawTextureRec(shipThrust.atlas, shipThrust.source, shipThrust.position, WHITE);
     DrawTexture(player.sprite, player.position.x, player.position.y, WHITE);
 }
 
