@@ -3,6 +3,7 @@
 void GameInitialize();
 void GameUpdate();
 void GameDraw();
+void GameDeInitialize();
 
 #define MAX_NUM_PEASHOOTER 50
 #define MAX_NUM_UP_CADET 20
@@ -15,5 +16,7 @@ void GameDraw();
 #define SCREEN_HEIGHT 720
 #define VSCREEN_WIDTH 480
 #define VSCREEN_HEIGHT 270
+
+
 
 
